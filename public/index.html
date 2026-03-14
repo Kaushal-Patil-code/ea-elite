@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E.A. Elite Trading Group</title>
+<meta name="description" content="E.A. Elite Trading Group — International trading conglomerate across Asia.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%231B2A4A' stroke='%23C5A55A' stroke-width='2'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='serif' font-size='14' font-weight='bold' fill='%23C5A55A'%3EEA%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --navy:#1B2A4A;--navy-dark:#0A0F1C;--navy-mid:#111B2E;
+  --gold:#C5A55A;--gold-light:#D4BA7A;--gold-pale:#F5EDD8;
+  --cream:#FAF7F0;--text:#2C3E50;--text-light:#6B7B8D;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--navy-dark);color:#fff;font-family:'DM Sans',sans-serif;overflow-x:hidden}
+
+/* ══════════════════════════════════════ */
+/*  SPLIT LAYOUT — Left scroll, Right 3D */
+/* ══════════════════════════════════════ */
+.layout{display:flex;min-height:100vh}
+
+/* LEFT: scrollable content */
+.content-rail{
+  width:50%;position:relative;z-index:10;
+  background:linear-gradient(180deg,var(--navy-dark) 0%,var(--navy-mid) 100%);
+  border-right:1px solid rgba(197,165,90,0.06);
+}
+
+/* RIGHT: fixed 3D globe */
+.globe-rail{
+  width:50%;position:fixed;top:0;right:0;height:100vh;z-index:1;
+  cursor:grab;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,rgba(27,42,74,0.3) 0%,var(--navy-dark) 70%);
+}
+.globe-rail:active{cursor:grabbing}
+#globe-canvas{width:100%;height:100%}
+
+/* City hover tooltip */
+.city-tooltip{
+  position:fixed;z-index:50;pointer-events:none;
+  background:rgba(10,15,28,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(197,165,90,0.25);border-radius:10px;
+  padding:12px 16px;min-width:180px;
+  opacity:0;transform:translateY(8px);
+  transition:opacity 0.25s ease,transform 0.25s ease;
+}
+.city-tooltip.show{opacity:1;transform:translateY(0)}
+.city-tooltip .ct-name{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:700;color:var(--gold);margin-bottom:3px}
+.city-tooltip .ct-role{font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;letter-spacing:0.5px;margin-bottom:6px}
+.city-tooltip .ct-desc{font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5}
+.city-tooltip .ct-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+
+/* Globe legend — compact */
+.globe-legend{
+  position:absolute;bottom:20px;left:20px;z-index:20;
+  background:rgba(10,15,28,0.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(197,165,90,0.1);border-radius:10px;
+  padding:10px 14px;max-width:200px;
+  opacity:0.8;transition:opacity 0.3s;
+}
+.globe-legend:hover{opacity:1}
+.gl-title{font-size:8px;color:var(--gold);font-weight:700;letter-spacing:2px;margin-bottom:7px}
+.gl-items{display:flex;flex-wrap:wrap;gap:3px 10px;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.gl-arcs{display:flex;flex-wrap:wrap;gap:3px 10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.gl-item{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,0.45)}
+.gl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.gl-line{width:12px;height:2px;border-radius:1px;flex-shrink:0}
+.gl-hq{color:var(--gold);font-size:8px;margin-left:1px}
+.gl-hint{font-size:8px;color:rgba(255,255,255,0.2);letter-spacing:0.3px}
+
+/* Back from zoom button */
+.zoom-back{
+  position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:25;
+  display:none;align-items:center;gap:6px;
+  background:rgba(10,15,28,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(197,165,90,0.25);border-radius:10px;
+  padding:10px 20px;cursor:pointer;transition:all 0.3s;color:var(--gold);font-size:12px;font-weight:600;
+  font-family:'DM Sans',sans-serif;letter-spacing:0.5px;
+}
+.zoom-back.show{display:flex}
+.zoom-back:hover{background:rgba(197,165,90,0.15);border-color:rgba(197,165,90,0.5)}
+.zoom-back svg{width:14px;height:14px;fill:var(--gold)}
+
+/* ══════════════════════════════════════ */
+/*  SECTION BLOCKS                       */
+/* ══════════════════════════════════════ */
+.section-block{
+  min-height:100vh;padding:100px 48px 80px 48px;
+  display:flex;flex-direction:column;justify-content:center;
+  position:relative;
+  border-bottom:1px solid rgba(197,165,90,0.04);
+}
+.section-block::after{
+  content:'';position:absolute;bottom:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(197,165,90,0.12),transparent);
+}
+
+/* Fade-in animation */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity 0.7s cubic-bezier(.16,1,.3,1),transform 0.7s cubic-bezier(.16,1,.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-d1{transition-delay:0.1s}
+.reveal-d2{transition-delay:0.2s}
+.reveal-d3{transition-delay:0.3s}
+.reveal-d4{transition-delay:0.4s}
+
+/* ══════════════════════════════════════ */
+/*  TYPOGRAPHY                           */
+/* ══════════════════════════════════════ */
+.tag{display:inline-flex;align-items:center;gap:10px;color:var(--gold);font-size:11px;letter-spacing:3px;font-weight:600;margin-bottom:18px}
+.tag::before{content:'';width:28px;height:1px;background:var(--gold)}
+.heading-hero{font-family:'Cormorant Garamond',serif;font-size:clamp(40px,4.5vw,64px);font-weight:700;line-height:1.06;margin-bottom:22px}
+.heading-section{font-family:'Cormorant Garamond',serif;font-size:clamp(30px,3vw,44px);font-weight:700;line-height:1.12;margin-bottom:18px}
+.gold{color:var(--gold)}
+.body-text{color:rgba(255,255,255,0.55);font-size:15px;line-height:1.78;margin-bottom:28px;max-width:480px}
+
+/* ══════════════════════════════════════ */
+/*  BUTTONS                              */
+/* ══════════════════════════════════════ */
+.btn-gold{
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy-dark);
+  border:none;padding:14px 30px;border-radius:8px;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(197,165,90,0.3);transition:all 0.3s
+}
+.btn-gold:hover{box-shadow:0 8px 35px rgba(197,165,90,0.5);transform:translateY(-2px)}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.03);color:var(--gold-light);
+  border:1px solid rgba(197,165,90,0.2);padding:14px 30px;border-radius:8px;
+  font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.3s
+}
+.btn-ghost:hover{background:rgba(197,165,90,0.06);border-color:rgba(197,165,90,0.35)}
+
+/* ══════════════════════════════════════ */
+/*  CARDS                                */
+/* ══════════════════════════════════════ */
+.mini-card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(197,165,90,0.07);
+  border-radius:12px;padding:18px;transition:all 0.35s
+}
+.mini-card:hover{background:rgba(255,255,255,0.06);border-color:rgba(197,165,90,0.18);transform:translateY(-3px)}
+
+/* ══════════════════════════════════════ */
+/*  STATS GRID                           */
+/* ══════════════════════════════════════ */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px}
+.stat-box{text-align:center;padding:16px 8px;background:rgba(255,255,255,0.025);border:1px solid rgba(197,165,90,0.05);border-radius:10px}
+.stat-n{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:var(--gold);text-shadow:0 0 20px rgba(197,165,90,0.25)}
+.stat-l{font-size:10px;color:rgba(255,255,255,0.35);margin-top:4px;letter-spacing:0.5px}
+
+/* ══════════════════════════════════════ */
+/*  NAV                                  */
+/* ══════════════════════════════════════ */
+.topnav{
+  position:fixed;top:0;left:0;width:50%;z-index:100;padding:0 48px;height:68px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(10,15,28,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(197,165,90,0.06);transition:all 0.4s
+}
+.topnav.scrolled{background:rgba(10,15,28,0.95)}
+.nav-brand{display:flex;align-items:center;gap:11px;cursor:pointer}
+.nav-brand-circle{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center}
+.nav-brand-circle span{color:var(--gold);font-weight:800;font-size:11px;font-family:'Cormorant Garamond',serif}
+.nav-items{display:flex;gap:2px;align-items:center}
+.nav-items button{background:none;border:none;color:rgba(255,255,255,0.4);font-size:11px;padding:7px 10px;cursor:pointer;border-radius:5px;font-family:'DM Sans',sans-serif;transition:all 0.3s;white-space:nowrap}
+.nav-items button.active{color:var(--gold);font-weight:600}
+.nav-items button:hover{color:rgba(255,255,255,0.7)}
+.lang-sw{display:flex;background:rgba(255,255,255,0.05);border-radius:16px;border:1px solid rgba(197,165,90,0.12);overflow:hidden}
+.lang-sw button{border:none;padding:5px 12px;font-size:10px;font-weight:700;cursor:pointer;transition:all 0.3s}
+.lang-sw button.on{background:var(--gold);color:var(--navy-dark)}
+.lang-sw button:not(.on){background:transparent;color:rgba(255,255,255,0.35)}
+
+/* Scroll progress */
+.scroll-bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--gold),var(--gold-light));z-index:200;width:0%;transition:width 0.05s linear}
+
+/* Section dots */
+.sec-dots{position:fixed;left:24px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:10px}
+.sec-dots button{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(197,165,90,0.25);background:transparent;cursor:pointer;transition:all 0.4s;padding:0}
+.sec-dots button.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(197,165,90,0.4);transform:scale(1.4)}
+
+/* Globe section label */
+.globe-section-label{display:none}
+
+/* Scroll hint */
+.scroll-cue{
+  position:fixed;bottom:28px;left:25%;transform:translateX(-50%);z-index:50;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  transition:opacity 0.5s;
+}
+.scroll-cue.gone{opacity:0;pointer-events:none}
+.scroll-cue span{color:rgba(255,255,255,0.25);font-size:10px;letter-spacing:2px}
+.mouse-i{width:20px;height:32px;border:1.5px solid rgba(197,165,90,0.35);border-radius:10px;position:relative}
+.mouse-i::after{content:'';position:absolute;top:7px;left:50%;transform:translateX(-50%);width:2px;height:7px;background:var(--gold);border-radius:2px;animation:mScroll 1.8s ease-in-out infinite}
+@keyframes mScroll{0%{opacity:1;top:7px}100%{opacity:0;top:17px}}
+
+/* ══════════════════════════════════════ */
+/*  FOOTER                               */
+/* ══════════════════════════════════════ */
+.site-footer{padding:40px 48px 24px;border-top:1px solid rgba(197,165,90,0.06);background:rgba(10,15,28,0.5)}
+
+/* ══════════════════════════════════════ */
+/*  RESPONSIVE                           */
+/* ══════════════════════════════════════ */
+@media(max-width:900px){
+  .layout{flex-direction:column}
+  .content-rail{width:100%}
+  .globe-rail{width:100%;position:relative;height:50vh;border-right:none;border-bottom:1px solid rgba(197,165,90,0.06)}
+  .topnav{width:100%}
+  .section-block{min-height:auto;padding:60px 24px}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .nav-items{display:none}
+  .sec-dots{display:none}
+  .scroll-cue{left:50%}
+  .globe-section-label{display:none}
+  .globe-legend{bottom:10px;left:10px;max-width:170px;padding:8px 10px}
+}
+</style>
+</head>
+<body>
+
+<div class="scroll-bar" id="scrollBar"></div>
+
+<div class="layout">
+  <!-- LEFT: CONTENT -->
+  <div class="content-rail" id="contentRail">
+    <nav class="topnav" id="topnav">
+      <div class="nav-brand" onclick="goTo('hero')">
+        <div class="nav-brand-circle"><span>EA</span></div>
+        <div>
+          <div style="color:#fff;font-family:'Cormorant Garamond',serif;font-weight:700;font-size:14px;line-height:1.1;letter-spacing:0.8px">E.A. ELITE</div>
+          <div style="color:var(--gold);font-size:8px;letter-spacing:2.5px;font-weight:600">TRADING GROUP</div>
+        </div>
+      </div>
+      <div class="nav-items" id="navItems"></div>
+      <div class="lang-sw"><button class="on" id="lEn" onclick="setLang('en')">EN</button><button id="lJa" onclick="setLang('ja')">日本語</button></div>
+    </nav>
+
+    <div id="sections"></div>
+  </div>
+
+  <!-- RIGHT: GLOBE -->
+  <div class="globe-rail">
+    <div id="globe-canvas"></div>
+    <div class="globe-legend" id="globeLegend"></div>
+    <button class="zoom-back" id="zoomBack" onclick="window._zoomBack&&window._zoomBack()">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      <span id="zoomBackText">Back to overview</span>
+    </button>
+  </div>
+</div>
+
+<div class="sec-dots" id="secDots"></div>
+<div class="scroll-cue" id="scrollCue"><div class="mouse-i"></div><span>SCROLL TO EXPLORE</span></div>
+<div class="globe-section-label" id="globeLabel"></div>
+<div class="city-tooltip" id="cityTooltip">
+  <div class="ct-name" id="ctName"></div>
+  <div class="ct-role" id="ctRole"></div>
+  <div class="ct-desc" id="ctDesc"></div>
+</div>
+
+<script>
+var currentLang='en';
+var LANG={
+en:{
+  scrollHint:'SCROLL TO EXPLORE',backBtn:'Back to overview',
+  legend:{title:'TRADE MAP',land:'Land',ocean:'Ocean',trade:'Trade routes',sourcing:'Sourcing',hint:'Click cities to zoom \u00b7 Drag to rotate'},
+  footer:{tagline:'Bridging Together to Prosperity',copy:'\u00a9 2026 E.A. Elite Trading Co., Ltd.',est:'Est. 2008 \u2014 Bangkok',countries:['Thailand','Japan','Singapore','Myanmar']},
+  cities:[
+    {role:'Group Headquarters',desc:'Parent company hub \u2014 international trading, strategic management across all verticals.'},
+    {role:'Japan Expansion',desc:'New market entry \u2014 partnerships, distribution, B2B trade for agriculture and seafood.'},
+    {role:'Regional Trade Hub',desc:'Gateway between Southeast Asia and global markets for commodity trading.'},
+    {role:'Sourcing & Agriculture',desc:'Key sourcing \u2014 commodities, seafood, and Minn\'s Fresh Farm plantation.'},
+    {role:'Export Market',desc:'Major export destination for agricultural commodities, seafood, and minerals.'},
+    {role:'China Trade',desc:'Growing export market for maize, seafood, and commodity products.'},
+  ],
+  cityNames:['Bangkok','Tokyo','Singapore','Yangon','Dubai','Shanghai'],
+  sections:[
+    {id:'hero',nav:'Home',tag:'EST. 2008 \u2014 BANGKOK, THAILAND',h:'E.A. Elite<br><span class="gold">Trading Group</span>',hClass:'heading-hero',p:'A diversified international trading conglomerate bridging commercial opportunities across Asia \u2014 from agriculture and seafood to hospitality and consumer goods.',cta1:'Japan Expansion \u2192',cta2:'Learn More',stats:[{n:'25+',l:'YEARS'},{n:'160',l:'STAFF'},{n:'10K+',l:'EXPORTED'},{n:'3K+',l:'CUSTOMERS'}],label:'GLOBAL'},
+    {id:'about',nav:'About',tag:'ABOUT US',h:'Bridging Commerce<br><span class="gold">Across Borders</span>',p:'Founded in Bangkok in 2008, E.A. Elite grew from commodity trading into a diversified conglomerate \u2014 agriculture, seafood, hospitality, F&B, and plantation farming. We import from Myanmar and export to Thailand, Dubai, China, Japan, and Singapore.',founderTitle:'Founder & Managing Director',founderTags:['Medical Doctor','MBA \u2014 Liverpool, UK','30+ Years Experience'],vision:'Partner of choice for trade between Asia and Europe',mission:'Top business partner bridging Asia and the world',label:'ABOUT'},
+    {id:'group',nav:'Group',tag:'OUR GROUP',h:'Group of<br><span class="gold">Companies</span>',p:'Five entities across Thailand, Japan, Singapore, and Myanmar.',companies:[{n:'E.A. Elite Trading Co., Ltd',l:'Thailand \u2014 Parent HQ',c:'#C5A55A'},{n:'E.A. Elite Co., Ltd',l:'Japan \u2014 Market Expansion',c:'#FF6B6B'},{n:'E.A. Elite Co., Ltd',l:'Singapore \u2014 Trade Hub',c:'#4ECDC4'},{n:'Medi-Tech Biz (Thailand)',l:'Bangkok \u2014 Trading & Hotels',c:'#45B7D1'},{n:"Minn's Fresh Farm Myanmar",l:'Myanmar \u2014 Plantation',c:'#2ECC71'}],label:'GROUP'},
+    {id:'business',nav:'Business',tag:'BUSINESS SCOPE',h:'Diversified<br><span class="gold">Portfolio</span>',p:'Six key verticals powering growth across the region.',verticals:[{i:'\ud83c\udf3e',t:'Agricultural',d:'Maize, commodities'},{i:'\ud83d\udc1f',t:'Seafood',d:'Frozen Rohu, cold chain'},{i:'\u26cf\ufe0f',t:'Minerals & Metals',d:'Copper, ores'},{i:'\ud83c\udfe8',t:'Hotels',d:'Bangkok budget stays'},{i:'\u2615',t:'F&B',d:'Coffee Ville, Shabu'},{i:'\ud83c\udf53',t:'Plantation',d:'Strawberries, wine'}],label:'TRADE'},
+    {id:'numbers',nav:'Track Record',tag:'TRACK RECORD',h:'Our Numbers<br><span class="gold">Speak</span>',p:'Proven results from decades of international commerce.',numStats:[{n:'25+',l:'Years'},{n:'160',l:'Team'},{n:'10K+',l:'Exported'},{n:'15K+',l:'Imported'},{n:'3K+',l:'Customers'},{n:'5',l:'Countries'}],label:'RECORD'},
+    {id:'japan',nav:'Japan',tag:'JAPAN EXPANSION',h:'Entering the<br><span class="gold">Japanese Market</span>',p:'Actively expanding into Japan \u2014 seeking partnerships, investors, and B2B distribution.',objectives:[{i:'\ud83e\udd1d',t:'Partners & Distributors',d:'Seeking Japanese trading companies for agriculture and seafood.'},{i:'\ud83d\udcb0',t:'Strategic Investors',d:'Inviting investment in our Southeast Asia portfolio.'},{i:'\ud83d\udce6',t:'Direct B2B Sales',d:'Direct supply of quality products to Japanese businesses.'}],products:['Yellow Maize','Frozen Rohu','Seafood','Minerals','Strawberries','Preserves'],label:'JAPAN'},
+    {id:'contact',nav:'Contact',tag:'GET IN TOUCH',h:'Contact<br><span class="gold">Us</span>',p:'Interested in partnerships, distribution, or investment? We\'d love to hear from you.',hqLabel:'HEADQUARTERS \u2014 THAILAND',japanLabel:'JAPAN OFFICE',sgLabel:'SINGAPORE',comingSoon:'Coming soon',label:'CONTACT'},
+  ]
+},
+ja:{
+  scrollHint:'\u30b9\u30af\u30ed\u30fc\u30eb\u3057\u3066\u63a2\u7d22',backBtn:'\u5168\u4f53\u8868\u793a\u306b\u623b\u308b',
+  legend:{title:'\u8cbf\u6613\u30de\u30c3\u30d7',land:'\u9678\u5730',ocean:'\u6d77\u6d0b',trade:'\u8cbf\u6613\u30eb\u30fc\u30c8',sourcing:'\u8abf\u9054\u30eb\u30fc\u30c8',hint:'\u90fd\u5e02\u30af\u30ea\u30c3\u30af\u3067\u30ba\u30fc\u30e0 \u00b7 \u30c9\u30e9\u30c3\u30b0\u3067\u56de\u8ee2'},
+  footer:{tagline:'\u5171\u306b\u7e41\u6804\u3078\u306e\u67b6\u3051\u6a4b\u3092',copy:'\u00a9 2026 E.A. Elite Trading Co., Ltd.',est:'2008\u5e74\u8a2d\u7acb \u2014 \u30d0\u30f3\u30b3\u30af',countries:['\u30bf\u30a4','\u65e5\u672c','\u30b7\u30f3\u30ac\u30dd\u30fc\u30eb','\u30df\u30e3\u30f3\u30de\u30fc']},
+  cities:[
+    {role:'\u30b0\u30eb\u30fc\u30d7\u672c\u793e',desc:'\u89aa\u4f1a\u793e\u672c\u90e8 \u2014 \u5168\u4e8b\u696d\u90e8\u9580\u306b\u308f\u305f\u308b\u56fd\u969b\u8cbf\u6613\u3001\u6226\u7565\u30de\u30cd\u30b8\u30e1\u30f3\u30c8\u3002'},
+    {role:'\u65e5\u672c\u5e02\u5834\u5c55\u958b',desc:'\u65e5\u672c\u5e02\u5834\u3078\u306e\u65b0\u898f\u53c2\u5165 \u2014 \u30d1\u30fc\u30c8\u30ca\u30fc\u30b7\u30c3\u30d7\u3001\u6d41\u901a\u3001B2B\u53d6\u5f15\u3002'},
+    {role:'\u5730\u57df\u8cbf\u6613\u30cf\u30d6',desc:'\u6771\u5357\u30a2\u30b8\u30a2\u3068\u30b0\u30ed\u30fc\u30d0\u30eb\u5e02\u5834\u3092\u7d50\u3076\u30b2\u30fc\u30c8\u30a6\u30a7\u30a4\u3002'},
+    {role:'\u8abf\u9054\u30fb\u8fb2\u696d',desc:'\u4e3b\u8981\u8abf\u9054\u5730 \u2014 \u8fb2\u7523\u7269\u3001\u6c34\u7523\u7269\u3001\u30df\u30f3\u30ba\u30d5\u30ec\u30c3\u30b7\u30e5\u30d5\u30a1\u30fc\u30e0\u3002'},
+    {role:'\u8f38\u51fa\u5e02\u5834',desc:'\u8fb2\u7523\u7269\u3001\u6c34\u7523\u7269\u3001\u9271\u7269\u306e\u4e3b\u8981\u8f38\u51fa\u5148\u3002'},
+    {role:'\u4e2d\u56fd\u8cbf\u6613',desc:'\u30c8\u30a6\u30e2\u30ed\u30b3\u30b7\u3001\u6c34\u7523\u7269\u306e\u6210\u9577\u3059\u308b\u8f38\u51fa\u5e02\u5834\u3002'},
+  ],
+  cityNames:['\u30d0\u30f3\u30b3\u30af','\u6771\u4eac','\u30b7\u30f3\u30ac\u30dd\u30fc\u30eb','\u30e4\u30f3\u30b4\u30f3','\u30c9\u30d0\u30a4','\u4e0a\u6d77'],
+  sections:[
+    {id:'hero',nav:'\u30db\u30fc\u30e0',tag:'2008\u5e74\u8a2d\u7acb \u2014 \u30bf\u30a4\u30fb\u30d0\u30f3\u30b3\u30af',h:'E.A. Elite<br><span class="gold">Trading Group</span>',hClass:'heading-hero',p:'\u8fb2\u7523\u7269\u30fb\u6c34\u7523\u7269\u304b\u3089\u30db\u30b9\u30d4\u30bf\u30ea\u30c6\u30a3\u30fb\u6d88\u8cbb\u8ca1\u307e\u3067\u3001\u30a2\u30b8\u30a2\u5168\u57df\u3067\u5546\u696d\u6a5f\u4f1a\u3092\u7d50\u3076\u591a\u89d2\u7684\u56fd\u969b\u8cbf\u6613\u30b0\u30eb\u30fc\u30d7\u3067\u3059\u3002',cta1:'\u65e5\u672c\u5e02\u5834\u3078\u306e\u5c55\u958b \u2192',cta2:'\u8a73\u3057\u304f\u898b\u308b',stats:[{n:'25+',l:'\u5e74\u306e\u7d4c\u9a13'},{n:'160',l:'\u30b9\u30bf\u30c3\u30d5'},{n:'1\u4e07+',l:'\u30c8\u30f3\u8f38\u51fa'},{n:'3\u5343+',l:'\u9867\u5ba2'}],label:'\u30b0\u30ed\u30fc\u30d0\u30eb'},
+    {id:'about',nav:'\u4f1a\u793e\u6982\u8981',tag:'\u4f1a\u793e\u6982\u8981',h:'\u56fd\u5883\u3092\u8d8a\u3048\u305f<br><span class="gold">\u5546\u53d6\u5f15\u306e\u67b6\u3051\u6a4b</span>',p:'2008\u5e74\u306b\u30d0\u30f3\u30b3\u30af\u3067\u8a2d\u7acb\u3002\u56fd\u969b\u5546\u54c1\u53d6\u5f15\u304b\u3089\u591a\u89d2\u7684\u30b3\u30f3\u30b0\u30ed\u30de\u30ea\u30c3\u30c8\u306b\u6210\u9577\u3002',founderTitle:'\u5275\u696d\u8005\u517c\u4ee3\u8868\u53d6\u7de0\u5f79',founderTags:['\u533b\u5e2b','MBA \u2014 \u82f1\u56fd\u30ea\u30d0\u30d7\u30fc\u30eb\u5927\u5b66','30\u5e74\u4ee5\u4e0a\u306e\u7d4c\u55b6\u7d4c\u9a13'],vision:'\u30a2\u30b8\u30a2\u3068\u30e8\u30fc\u30ed\u30c3\u30d1\u9593\u306e\u8cbf\u6613\u306b\u304a\u3051\u308b\u6700\u826f\u306e\u30d1\u30fc\u30c8\u30ca\u30fc',mission:'\u30a2\u30b8\u30a2\u3068\u4e16\u754c\u3092\u3064\u306a\u3050\u30c8\u30c3\u30d7\u30d3\u30b8\u30cd\u30b9\u30d1\u30fc\u30c8\u30ca\u30fc',label:'\u6982\u8981'},
+    {id:'group',nav:'\u30b0\u30eb\u30fc\u30d7',tag:'\u30b0\u30eb\u30fc\u30d7\u4f1a\u793e',h:'\u30b0\u30eb\u30fc\u30d7<br><span class="gold">\u4f01\u696d\u4e00\u89a7</span>',p:'\u30bf\u30a4\u3001\u65e5\u672c\u3001\u30b7\u30f3\u30ac\u30dd\u30fc\u30eb\u3001\u30df\u30e3\u30f3\u30de\u30fc\u306e5\u4e8b\u696d\u4f53\u3002',companies:[{n:'E.A. Elite Trading Co., Ltd',l:'\u30bf\u30a4 \u2014 \u89aa\u4f1a\u793e\u672c\u90e8',c:'#C5A55A'},{n:'E.A. Elite Co., Ltd',l:'\u65e5\u672c \u2014 \u5e02\u5834\u62e1\u5927',c:'#FF6B6B'},{n:'E.A. Elite Co., Ltd',l:'\u30b7\u30f3\u30ac\u30dd\u30fc\u30eb \u2014 \u8cbf\u6613\u30cf\u30d6',c:'#4ECDC4'},{n:'Medi-Tech Biz (Thailand)',l:'\u30d0\u30f3\u30b3\u30af \u2014 \u8cbf\u6613\u30fb\u30db\u30c6\u30eb',c:'#45B7D1'},{n:"Minn's Fresh Farm Myanmar",l:'\u30df\u30e3\u30f3\u30de\u30fc \u2014 \u30d7\u30e9\u30f3\u30c6\u30fc\u30b7\u30e7\u30f3',c:'#2ECC71'}],label:'\u30b0\u30eb\u30fc\u30d7'},
+    {id:'business',nav:'\u4e8b\u696d\u5185\u5bb9',tag:'\u4e8b\u696d\u5185\u5bb9',h:'\u591a\u89d2\u7684<br><span class="gold">\u30dd\u30fc\u30c8\u30d5\u30a9\u30ea\u30aa</span>',p:'6\u3064\u306e\u4e3b\u8981\u4e8b\u696d\u3002',verticals:[{i:'\ud83c\udf3e',t:'\u8fb2\u7523\u7269\u53d6\u5f15',d:'\u30c8\u30a6\u30e2\u30ed\u30b3\u30b7\u3001\u5546\u54c1'},{i:'\ud83d\udc1f',t:'\u6c34\u7523\u7269\u53d6\u5f15',d:'\u51b7\u51cd\u30ed\u30d5\u9b5a'},{i:'\u26cf\ufe0f',t:'\u9271\u7269\u30fb\u91d1\u5c5e',d:'\u9285\u3001\u9271\u77f3'},{i:'\ud83c\udfe8',t:'\u30db\u30c6\u30eb',d:'\u30d0\u30f3\u30b3\u30af\u5bbf\u6cca'},{i:'\u2615',t:'\u98f2\u98df',d:'Coffee Ville\u3001\u3057\u3083\u3076\u3057\u3083\u3076'},{i:'\ud83c\udf53',t:'\u30d7\u30e9\u30f3\u30c6\u30fc\u30b7\u30e7\u30f3',d:'\u30a4\u30c1\u30b4\u3001\u30ef\u30a4\u30f3'}],label:'\u4e8b\u696d'},
+    {id:'numbers',nav:'\u5b9f\u7e3e',tag:'\u5b9f\u7e3e',h:'\u6570\u5b57\u304c\u8a9e\u308b<br><span class="gold">\u5b9f\u529b</span>',p:'\u6570\u5341\u5e74\u306e\u5b9f\u7e3e\u3002',numStats:[{n:'25+',l:'\u5e74'},{n:'160',l:'\u30c1\u30fc\u30e0'},{n:'1\u4e07+',l:'\u8f38\u51fa'},{n:'1.5\u4e07+',l:'\u8f38\u5165'},{n:'3\u5343+',l:'\u9867\u5ba2'},{n:'5',l:'\u30ab\u56fd'}],label:'\u5b9f\u7e3e'},
+    {id:'japan',nav:'\u65e5\u672c\u5c55\u958b',tag:'\u65e5\u672c\u5e02\u5834\u5c55\u958b',h:'\u65e5\u672c\u5e02\u5834\u3078\u306e<br><span class="gold">\u9032\u51fa</span>',p:'\u65e5\u672c\u306b\u7a4d\u6975\u5c55\u958b\u4e2d\u3002',objectives:[{i:'\ud83e\udd1d',t:'\u30d1\u30fc\u30c8\u30ca\u30fc',d:'\u65e5\u672c\u5546\u793e\u3092\u958b\u62d3\u3002'},{i:'\ud83d\udcb0',t:'\u6295\u8cc7\u5bb6',d:'\u6295\u8cc7\u3092\u6b53\u8fce\u3002'},{i:'\ud83d\udce6',t:'B2B\u53d6\u5f15',d:'\u76f4\u63a5\u4f9b\u7d66\u3002'}],products:['\u30c8\u30a6\u30e2\u30ed\u30b3\u30b7','\u51b7\u51cd\u30ed\u30d5\u9b5a','\u6c34\u7523\u7269','\u9271\u7269','\u30a4\u30c1\u30b4','\u30b8\u30e3\u30e0'],label:'\u65e5\u672c'},
+    {id:'contact',nav:'\u304a\u554f\u3044\u5408\u308f\u305b',tag:'\u304a\u554f\u3044\u5408\u308f\u305b',h:'\u304a\u554f\u3044<br><span class="gold">\u5408\u308f\u305b</span>',p:'\u304a\u554f\u3044\u5408\u308f\u305b\u3092\u304a\u5f85\u3061\u3057\u3066\u304a\u308a\u307e\u3059\u3002',hqLabel:'\u672c\u793e \u2014 \u30bf\u30a4',japanLabel:'\u65e5\u672c\u30aa\u30d5\u30a3\u30b9',sgLabel:'\u30b7\u30f3\u30ac\u30dd\u30fc\u30eb',comingSoon:'\u8fd1\u65e5\u516c\u958b',label:'\u9023\u7d61'},
+  ]
+}
+};
+function LD(){return LANG[currentLang]}
+
+// ═══ BUILD PAGE (same as before, shortened for space) ═══
+function buildPage(){var d=LD(),secs=d.sections,wrap=document.getElementById('sections'),nav=document.getElementById('navItems'),dots=document.getElementById('secDots');wrap.innerHTML='';nav.innerHTML='';dots.innerHTML='';var cue=document.querySelector('.scroll-cue span');if(cue)cue.textContent=d.scrollHint;document.getElementById('zoomBackText').textContent=d.backBtn;
+secs.forEach(function(s,i){var sec=document.createElement('div');sec.className='section-block';sec.id=s.id;var inner='<div class="reveal"><div class="tag">'+s.tag+'</div></div><div class="reveal reveal-d1"><h1 class="'+(s.hClass||'heading-section')+'">'+s.h+'</h1></div><div class="reveal reveal-d2"><p class="body-text">'+s.p+'</p></div>';
+if(s.id==='hero'){inner+='<div class="reveal reveal-d3"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px"><button class="btn-gold" onclick="goTo(\'japan\')">'+s.cta1+'</button><button class="btn-ghost" onclick="goTo(\'about\')">'+s.cta2+'</button></div><div class="stats-row">'+s.stats.map(function(st){return'<div class="stat-box"><div class="stat-n">'+st.n+'</div><div class="stat-l">'+st.l+'</div></div>'}).join('')+'</div></div>'}
+if(s.id==='about'){inner+='<div class="reveal reveal-d3"><div style="margin-top:20px;display:flex;flex-direction:column;gap:12px"><div class="mini-card"><div style="font-weight:700;font-size:14px;margin-bottom:6px">'+s.founderTitle+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+s.founderTags.map(function(t){return'<span style="background:rgba(197,165,90,0.1);color:var(--gold-light);font-size:10px;padding:3px 10px;border-radius:12px">'+t+'</span>'}).join('')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="mini-card" style="text-align:center"><div style="color:var(--gold);font-size:11px;font-weight:600;letter-spacing:1px;margin-bottom:5px">VISION</div><div style="color:rgba(255,255,255,0.45);font-size:12px;line-height:1.5">'+s.vision+'</div></div><div class="mini-card" style="text-align:center"><div style="color:var(--gold);font-size:11px;font-weight:600;letter-spacing:1px;margin-bottom:5px">MISSION</div><div style="color:rgba(255,255,255,0.45);font-size:12px;line-height:1.5">'+s.mission+'</div></div></div></div></div>'}
+if(s.id==='group'){inner+='<div class="reveal reveal-d3"><div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">'+s.companies.map(function(c){return'<div class="mini-card" style="display:flex;gap:14px;align-items:center"><div style="width:10px;height:10px;border-radius:50%;background:'+c.c+';flex-shrink:0;box-shadow:0 0 8px '+c.c+'40"></div><div><div style="font-weight:600;font-size:13px">'+c.n+'</div><div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px">'+c.l+'</div></div></div>'}).join('')+'</div></div>'}
+if(s.id==='business'){inner+='<div class="reveal reveal-d3"><div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'+s.verticals.map(function(v){return'<div class="mini-card"><div style="font-size:20px;margin-bottom:6px">'+v.i+'</div><div style="font-weight:600;font-size:12px">'+v.t+'</div><div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:3px">'+v.d+'</div></div>'}).join('')+'</div></div>'}
+if(s.id==='numbers'){inner+='<div class="reveal reveal-d3"><div style="margin-top:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+s.numStats.map(function(st){return'<div class="mini-card" style="text-align:center;padding:18px 10px"><div style="font-family:\'Cormorant Garamond\',serif;font-size:30px;font-weight:700;color:var(--gold);text-shadow:0 0 20px rgba(197,165,90,0.2)">'+st.n+'</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px">'+st.l+'</div></div>'}).join('')+'</div></div>'}
+if(s.id==='japan'){inner+='<div class="reveal reveal-d3"><div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">'+s.objectives.map(function(o){return'<div class="mini-card"><div style="display:flex;gap:12px;align-items:flex-start"><span style="font-size:22px">'+o.i+'</span><div><div style="font-weight:600;font-size:13px">'+o.t+'</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px">'+o.d+'</div></div></div></div>'}).join('')+'</div><div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">'+s.products.map(function(p){return'<span style="background:rgba(197,165,90,0.1);border:1px solid rgba(197,165,90,0.15);color:var(--gold-light);padding:4px 12px;border-radius:16px;font-size:11px">'+p+'</span>'}).join('')+'</div></div>'}
+if(s.id==='contact'){inner+='<div class="reveal reveal-d3"><div style="margin-top:16px;display:flex;flex-direction:column;gap:10px"><div class="mini-card"><div style="font-size:9px;color:var(--gold);font-weight:600;letter-spacing:2px;margin-bottom:5px">'+s.hqLabel+'</div><div style="font-weight:700;font-family:\'Cormorant Garamond\',serif;font-size:16px;margin-bottom:5px">E.A. Elite Trading Co., Ltd</div><div style="font-size:11px;color:rgba(255,255,255,0.4);line-height:1.7">327/50, Kriz Town-4, Thairaman Road,<br>Bangkok, Thailand 10510</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px">\u2709 amazingmmsygn@gmail.com<br>\u2709 drminnzaw@gmail.com</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="mini-card"><div style="font-size:9px;color:var(--gold);letter-spacing:2px;font-weight:600;margin-bottom:3px">'+s.japanLabel+'</div><div style="font-size:12px;font-weight:600">E.A. Elite Co., Ltd</div><div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:3px;font-style:italic">'+s.comingSoon+'</div></div><div class="mini-card"><div style="font-size:9px;color:var(--gold);letter-spacing:2px;font-weight:600;margin-bottom:3px">'+s.sgLabel+'</div><div style="font-size:12px;font-weight:600">E.A. Elite Co., Ltd</div><div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:3px;font-style:italic">'+s.comingSoon+'</div></div></div></div></div>'}
+sec.innerHTML=inner;wrap.appendChild(sec);var nb=document.createElement('button');nb.textContent=s.nav;nb.id='n-'+s.id;nb.onclick=(function(sid){return function(){goTo(sid)}})(s.id);nav.appendChild(nb);var db=document.createElement('button');db.id='d-'+s.id;db.title=s.nav;db.onclick=(function(sid){return function(){goTo(sid)}})(s.id);dots.appendChild(db)});
+var ft=document.createElement('div');ft.className='site-footer';var d2=LD();ft.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px"><div><div style="font-family:\'Cormorant Garamond\',serif;font-weight:700;font-size:18px;margin-bottom:3px">E.A. Elite Trading Group</div><div style="color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px">'+d2.footer.tagline+'</div></div><div style="display:flex;gap:20px">'+d2.footer.countries.map(function(c){return'<span style="color:rgba(255,255,255,0.25);font-size:11px">'+c+'</span>'}).join('')+'</div></div><div style="border-top:1px solid rgba(255,255,255,0.04);padding-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px"><span style="color:rgba(255,255,255,0.18);font-size:11px">'+d2.footer.copy+'</span><span style="color:rgba(255,255,255,0.18);font-size:11px">'+d2.footer.est+'</span></div>';wrap.appendChild(ft);buildLegend()}
+
+function buildLegend(){var d=LD(),lg=d.legend,cn=d.cityNames;var el=document.getElementById('globeLegend');if(!el)return;el.innerHTML='<div class="gl-title">'+lg.title+'</div><div class="gl-items"><div class="gl-item"><span class="gl-dot" style="background:#C5A55A"></span>'+lg.land+'</div><div class="gl-item"><span class="gl-dot" style="background:#4A6FA5"></span>'+lg.ocean+'</div><div class="gl-item"><span class="gl-dot" style="background:#C5A55A;box-shadow:0 0 5px #C5A55A"></span>'+cn[0]+' \u2605</div><div class="gl-item"><span class="gl-dot" style="background:#FF6B6B"></span>'+cn[1]+'</div><div class="gl-item"><span class="gl-dot" style="background:#4ECDC4"></span>'+cn[2]+'</div><div class="gl-item"><span class="gl-dot" style="background:#45B7D1"></span>'+cn[3]+'</div><div class="gl-item"><span class="gl-dot" style="background:#F39C12"></span>'+cn[4]+'</div><div class="gl-item"><span class="gl-dot" style="background:#9B59B6"></span>'+cn[5]+'</div></div><div class="gl-arcs"><div class="gl-item"><span class="gl-line" style="background:linear-gradient(90deg,#C5A55A,#D4BA7A)"></span>'+lg.trade+'</div><div class="gl-item"><span class="gl-line" style="background:linear-gradient(90deg,#45B7D1,#4ECDC4)"></span>'+lg.sourcing+'</div></div><div class="gl-hint">'+lg.hint+'</div>'}
+function goTo(id){var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'})}
+function setLang(l){currentLang=l;document.getElementById('lEn').className=l==='en'?'on':'';document.getElementById('lJa').className=l==='ja'?'on':'';document.body.style.fontFamily=l==='ja'?"'Noto Sans JP','DM Sans',sans-serif":"'DM Sans',sans-serif";buildPage();onScroll()}
+
+// ═══════════════════════════════════
+// THREE.JS GLOBE — RICHER + CLICK ZOOM
+// ═══════════════════════════════════
+var globeGroup,camera,renderer;
+var arcTubes=[],tradeParts=[],cityMeshes=[],ambParts=[],landDots;
+var R=1.65; // SMALLER radius to avoid clipping
+function ll(lat,lng,r){var p=(90-lat)*Math.PI/180,t=(lng+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t))}
+var landR=[[1,55,60,145],[10,42,95,140],[-8,8,95,141],[12,42,25,63],[35,72,-12,50],[-35,37,-18,52],[5,35,65,92],[30,46,126,146],[-8,20,95,130],[-40,-10,112,155],[15,72,-170,-50],[-55,13,-82,-34]];
+function isL(a,o){for(var i=0;i<landR.length;i++){var r=landR[i];if(a>=r[0]&&a<=r[1]&&o>=r[2]&&o<=r[3])return true}return false}
+
+function initGlobe(){
+  var box=document.getElementById('globe-canvas');
+  var scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(45,box.clientWidth/box.clientHeight,0.1,1000);
+  camera.position.set(0,0,5);
+  renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
+  renderer.setSize(box.clientWidth,box.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000000,0);box.appendChild(renderer.domElement);
+  globeGroup=new THREE.Group();globeGroup.rotation.y=-3.33;globeGroup.rotation.x=0.14;scene.add(globeGroup);
+  scene.add(new THREE.AmbientLight(0xffffff,0.35));
+  var dl=new THREE.DirectionalLight(0xC5A55A,1);dl.position.set(5,3,5);scene.add(dl);
+  var dl2=new THREE.DirectionalLight(0x6B5FCC,0.4);dl2.position.set(-5,2,-3);scene.add(dl2);
+  var pl1=new THREE.PointLight(0xC5A55A,0.5,15);pl1.position.set(3,2,4);scene.add(pl1);
+
+  // ── DENSER LAND DOTS (step 1.8 instead of 2.6) ──
+  var dp=[];for(var la=-80;la<=80;la+=1.8)for(var lo=-180;lo<180;lo+=1.8)if(isL(la,lo)){var v=ll(la,lo,R);dp.push(v.x,v.y,v.z)}
+  var dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.Float32BufferAttribute(dp,3));
+  landDots=new THREE.Points(dg,new THREE.PointsMaterial({color:0xC5A55A,size:0.018,transparent:true,opacity:0.8,sizeAttenuation:true}));
+  globeGroup.add(landDots);
+
+  // ── DENSER OCEAN DOTS ──
+  var op=[];for(var la2=-80;la2<=80;la2+=5)for(var lo2=-180;lo2<180;lo2+=5)if(!isL(la2,lo2)){var v2=ll(la2,lo2,R);op.push(v2.x,v2.y,v2.z)}
+  var og=new THREE.BufferGeometry();og.setAttribute('position',new THREE.Float32BufferAttribute(op,3));
+  globeGroup.add(new THREE.Points(og,new THREE.PointsMaterial({color:0x4A6FA5,size:0.006,transparent:true,opacity:0.12,sizeAttenuation:true})));
+
+  // ── MORE GRATICULE LINES ──
+  [-75,-60,-45,-30,-15,0,15,30,45,60,75].forEach(function(la3){var pts=[];for(var lo3=0;lo3<=360;lo3+=2)pts.push(ll(la3,lo3-180,R+0.001));globeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x4A6FA5,transparent:true,opacity:0.05})))});
+  [-150,-120,-90,-60,-30,0,30,60,90,120,150,180].forEach(function(lo4){var pts=[];for(var la4=-80;la4<=80;la4+=2)pts.push(ll(la4,lo4,R+0.001));globeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x4A6FA5,transparent:true,opacity:0.035})))});
+
+  // ── WIREFRAME SPHERE for structure ──
+  var wfGeo=new THREE.SphereGeometry(R*0.998,36,24);
+  var wfMat=new THREE.MeshBasicMaterial({color:0x2A4066,wireframe:true,transparent:true,opacity:0.04});
+  globeGroup.add(new THREE.Mesh(wfGeo,wfMat));
+
+  // ── ATMOSPHERE GLOW (triple layer) ──
+  globeGroup.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.06,64,64),new THREE.MeshBasicMaterial({color:0x3A5C8A,transparent:true,opacity:0.06,side:THREE.BackSide})));
+  globeGroup.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.14,64,64),new THREE.MeshBasicMaterial({color:0xC5A55A,transparent:true,opacity:0.025,side:THREE.BackSide})));
+  globeGroup.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.22,64,64),new THREE.MeshBasicMaterial({color:0x1A2744,transparent:true,opacity:0.04,side:THREE.BackSide})));
+
+  // ── CITIES ──
+  var cityCoords=[
+    {la:13.75,lo:100.52,c:0xC5A55A,hq:1},
+    {la:35.68,lo:139.69,c:0xFF6B6B},
+    {la:1.35,lo:103.82,c:0x4ECDC4},
+    {la:16.87,lo:96.19,c:0x45B7D1},
+    {la:25.2,lo:55.27,c:0xF39C12},
+    {la:31.23,lo:121.47,c:0x9B59B6}
+  ];
+  var cityDotMeshes=[];
+  cityCoords.forEach(function(c,idx){
+    var p=ll(c.la,c.lo,R);
+    var hit=new THREE.Mesh(new THREE.SphereGeometry(0.07,16,16),new THREE.MeshBasicMaterial({transparent:true,opacity:0}));
+    hit.position.copy(p);
+    // Store raw position for dynamic zoom rotation computation
+    hit.userData={idx:idx,c:c.c,hq:c.hq,px:p.x,py:p.y,pz:p.z};
+    globeGroup.add(hit);cityDotMeshes.push(hit);
+    var dot=new THREE.Mesh(new THREE.SphereGeometry(c.hq?0.04:0.028,16,16),new THREE.MeshBasicMaterial({color:c.c}));dot.position.copy(p);globeGroup.add(dot);
+    var rn=new THREE.Mesh(new THREE.RingGeometry(0.035,0.055,32),new THREE.MeshBasicMaterial({color:c.c,transparent:true,opacity:0.7,side:THREE.DoubleSide}));rn.position.copy(p);rn.lookAt(0,0,0);globeGroup.add(rn);
+    // Outer pulse for all cities (not just HQ)
+    var pl=new THREE.Mesh(new THREE.RingGeometry(0.045,0.08,32),new THREE.MeshBasicMaterial({color:c.c,transparent:true,opacity:c.hq?0.3:0.15,side:THREE.DoubleSide}));pl.position.copy(p);pl.lookAt(0,0,0);globeGroup.add(pl);
+    cityMeshes.push({pulse:pl,isPulse:1,hq:c.hq});
+  });
+
+  // ── THICKER ARCS ──
+  [{f:0,t:1,c:0xC5A55A},{f:0,t:2,c:0xC5A55A},{f:0,t:3,c:0xD4BA7A},{f:0,t:4,c:0xF39C12},{f:0,t:5,c:0xC5A55A},{f:3,t:1,c:0x45B7D1},{f:3,t:4,c:0x45B7D1}].forEach(function(r){
+    var s=ll(cityCoords[r.f].la,cityCoords[r.f].lo,R),e=ll(cityCoords[r.t].la,cityCoords[r.t].lo,R);
+    var d=s.distanceTo(e),m=s.clone().add(e).multiplyScalar(0.5);m.normalize().multiplyScalar(R+d*0.35);
+    var cv=new THREE.QuadraticBezierCurve3(s,m,e);
+    var tb=new THREE.Mesh(new THREE.TubeGeometry(cv,64,0.006,8,false),new THREE.MeshBasicMaterial({color:r.c,transparent:true,opacity:0.22}));
+    globeGroup.add(tb);arcTubes.push(tb);
+    for(var i=0;i<4;i++){
+      var pm=new THREE.Mesh(new THREE.SphereGeometry(0.016,8,8),new THREE.MeshBasicMaterial({color:r.c,transparent:true,opacity:0.9}));
+      var gm=new THREE.Mesh(new THREE.SphereGeometry(0.04,8,8),new THREE.MeshBasicMaterial({color:r.c,transparent:true,opacity:0.2}));
+      globeGroup.add(pm);globeGroup.add(gm);
+      tradeParts.push({m:pm,g:gm,cv:cv,pr:i/4,sp:0.09+Math.random()*0.07});
+    }
+  });
+
+  // ── ORBITAL RINGS ──
+  var o1=new THREE.Mesh(new THREE.TorusGeometry(R*1.3,0.003,16,200),new THREE.MeshBasicMaterial({color:0xC5A55A,transparent:true,opacity:0.08}));
+  o1.rotation.x=Math.PI*0.52;o1.rotation.z=Math.PI*0.08;globeGroup.add(o1);
+  var o2=new THREE.Mesh(new THREE.TorusGeometry(R*1.45,0.002,16,200),new THREE.MeshBasicMaterial({color:0x6B5FCC,transparent:true,opacity:0.04}));
+  o2.rotation.x=Math.PI*0.3;o2.rotation.z=-Math.PI*0.12;globeGroup.add(o2);
+
+  // ── MORE AMBIENT PARTICLES (60) ──
+  for(var ai=0;ai<60;ai++){var sz=0.003+Math.random()*0.009;var mm=new THREE.Mesh(new THREE.SphereGeometry(sz,6,6),new THREE.MeshBasicMaterial({color:Math.random()>0.4?0xC5A55A:0x6B8EC2,transparent:true,opacity:0.08+Math.random()*0.2}));var aa=Math.random()*Math.PI*2,hh=-2+Math.random()*4,dd=R*1.2+Math.random()*1.3;mm.position.set(Math.cos(aa)*dd,hh,Math.sin(aa)*dd);globeGroup.add(mm);ambParts.push({m:mm,a:aa,h:hh,d:dd,sp:0.04+Math.random()*0.18,ys:0.03+Math.random()*0.08})}
+
+  // ── DRAG ──
+  var drag=0,px=0,py=0,urx=0,ury=0;
+  var gr=document.querySelector('.globe-rail');
+  gr.addEventListener('mousedown',function(e){if(zoomedCity)return;drag=1;px=e.clientX;py=e.clientY});
+  window.addEventListener('mouseup',function(){drag=0});
+  window.addEventListener('mousemove',function(e){if(!drag||zoomedCity)return;ury+=(e.clientX-px)*0.004;urx+=(e.clientY-py)*0.004;urx=Math.max(-1,Math.min(1,urx));px=e.clientX;py=e.clientY});
+  gr.addEventListener('touchstart',function(e){if(zoomedCity)return;if(e.touches.length===1){drag=1;px=e.touches[0].clientX;py=e.touches[0].clientY}},{passive:true});
+  window.addEventListener('touchend',function(){drag=0});
+  window.addEventListener('touchmove',function(e){if(!drag||zoomedCity||e.touches.length!==1)return;ury+=(e.touches[0].clientX-px)*0.004;urx+=(e.touches[0].clientY-py)*0.004;urx=Math.max(-1,Math.min(1,urx));px=e.touches[0].clientX;py=e.touches[0].clientY},{passive:true});
+
+  // ── RAYCASTER + CLICK-TO-ZOOM ──
+  var raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+  var tooltip=document.getElementById('cityTooltip'),ctName=document.getElementById('ctName'),ctRole=document.getElementById('ctRole'),ctDesc=document.getElementById('ctDesc');
+  var hoveredCity=null;
+  var zoomedCity=false;
+  var zoomedCityIdx=-1; // track which city is zoomed
+  function colorHex(c){return'#'+new THREE.Color(c).getHexString()}
+
+  // Helper: show tooltip for a city by index, positioned fixed in globe panel
+  function showCityInfo(idx,fixedPos){
+    var d=LD(),cn=d.cityNames[idx],ci=d.cities[idx],cc=cityCoords[idx];
+    ctName.innerHTML='<span class="ct-dot" style="background:'+colorHex(cc.c)+'"></span>'+cn+(cc.hq?' \u2605':'');
+    ctRole.textContent=ci.role;
+    ctDesc.textContent=ci.desc;
+    tooltip.classList.add('show');
+    if(fixedPos){
+      // Position at center-bottom of globe rail
+      var rect=gr.getBoundingClientRect();
+      tooltip.style.left=(rect.left+rect.width/2-90)+'px';
+      tooltip.style.top=(rect.top+rect.height*0.62)+'px';
+    }
+  }
+  function hideCityInfo(){
+    hoveredCity=null;
+    tooltip.classList.remove('show');
+  }
+
+  // Hover (only when NOT zoomed)
+  gr.addEventListener('mousemove',function(e){
+    if(zoomedCity)return; // no hover when zoomed — info already shown
+    var rect=gr.getBoundingClientRect();
+    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    var hits=raycaster.intersectObjects(cityDotMeshes);
+    if(hits.length>0){
+      var ud=hits[0].object.userData,d=LD(),cn=d.cityNames[ud.idx];
+      if(hoveredCity!==cn){
+        hoveredCity=cn;
+        showCityInfo(ud.idx,false);
+        gr.style.cursor='pointer';
+      }
+      tooltip.style.left=(e.clientX+16)+'px';tooltip.style.top=(e.clientY-20)+'px';
+      var tr=tooltip.getBoundingClientRect();if(tr.right>window.innerWidth-10)tooltip.style.left=(e.clientX-tr.width-16)+'px';if(tr.bottom>window.innerHeight-10)tooltip.style.top=(e.clientY-tr.height-10)+'px';
+    }else{if(hoveredCity){hideCityInfo();gr.style.cursor='grab'}}
+  });
+  gr.addEventListener('mouseleave',function(){if(!zoomedCity)hideCityInfo()});
+
+  // ── CLICK: Zoom to city ──
+  var autoRotAccum=0;
+  gr.addEventListener('click',function(e){
+    var rect=gr.getBoundingClientRect();
+    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    var hits=raycaster.intersectObjects(cityDotMeshes);
+    if(hits.length>0){
+      var ud=hits[0].object.userData;
+      // Absorb all current offsets into cur so no visual jump
+      cur.ry=cur.ry+ury+autoRotAccum;
+      cur.rx=cur.rx+urx;
+      ury=0; urx=0; autoRotAccum=0;
+      zoomedCity=true;
+      zoomedCityIdx=ud.idx;
+      // Compute exact rotation to center this city in view
+      var cRy=Math.atan2(-ud.px, ud.pz);
+      var cRx=Math.atan2(ud.py, Math.sqrt(ud.px*ud.px+ud.pz*ud.pz));
+      // Normalize cur.ry to be within PI of target — shortest rotation path
+      while(cur.ry-cRy>Math.PI)cur.ry-=Math.PI*2;
+      while(cur.ry-cRy<-Math.PI)cur.ry+=Math.PI*2;
+      tar.ry=cRy; tar.rx=cRx; tar.cz=3.6; tar.cy=0;
+      tar.aO=0.45; tar.pS=1.5; tar.lO=0.95;
+      gr.style.cursor='default';
+      document.getElementById('zoomBack').classList.add('show');
+      showCityInfo(ud.idx,true);
+    }
+  });
+
+  // ── BACK BUTTON: return to scroll-driven ──
+  window._zoomBack=function(){
+    cur.ry=cur.ry+ury+autoRotAccum;
+    cur.rx=cur.rx+urx;
+    ury=0; urx=0; autoRotAccum=0;
+    zoomedCity=false;
+    zoomedCityIdx=-1;
+    gr.style.cursor='grab';
+    hideCityInfo();
+    document.getElementById('zoomBack').classList.remove('show');
+    onScroll();
+    // Normalize cur.ry toward new tar.ry for shortest path
+    while(cur.ry-tar.ry>Math.PI)cur.ry-=Math.PI*2;
+    while(cur.ry-tar.ry<-Math.PI)cur.ry+=Math.PI*2;
+  };
+
+  // ── SCROLL KEYFRAMES ──
+  var KF=[
+    {ry:-3.33,rx:0.14,cy:0,cz:5.0,aO:0.22,pS:1.0,lO:0.80},
+    {ry:-3.33,rx:0.12,cy:-0.1,cz:4.0,aO:0.14,pS:0.5,lO:0.90},
+    {ry:-3.50,rx:0.18,cy:0,cz:4.6,aO:0.32,pS:1.2,lO:0.88},
+    {ry:-3.25,rx:0.15,cy:-0.1,cz:4.2,aO:0.38,pS:1.5,lO:0.92},
+    {ry:-3.10,rx:0.08,cy:0,cz:5.8,aO:0.22,pS:2.0,lO:0.72},
+    {ry:-4.01,rx:0.32,cy:-0.15,cz:3.5,aO:0.50,pS:1.8,lO:0.95},
+    {ry:-3.33,rx:0.12,cy:0,cz:4.5,aO:0.12,pS:0.4,lO:0.60},
+  ];
+  var cur={ry:KF[0].ry,rx:KF[0].rx,cy:KF[0].cy,cz:KF[0].cz,aO:KF[0].aO,pS:KF[0].pS,lO:KF[0].lO};
+  var tar={ry:KF[0].ry,rx:KF[0].rx,cy:KF[0].cy,cz:KF[0].cz,aO:KF[0].aO,pS:KF[0].pS,lO:KF[0].lO};
+
+  window._globeScroll=function(idx,prog){
+    if(zoomedCity)return; // don't override when zoomed
+    var a=KF[Math.min(idx,KF.length-1)],b=KF[Math.min(idx+1,KF.length-1)];
+    tar={ry:a.ry+(b.ry-a.ry)*prog,rx:a.rx+(b.rx-a.rx)*prog,cy:a.cy+(b.cy-a.cy)*prog,cz:a.cz+(b.cz-a.cz)*prog,aO:a.aO+(b.aO-a.aO)*prog,pS:a.pS+(b.pS-a.pS)*prog,lO:a.lO+(b.lO-a.lO)*prog};
+  };
+
+  var clock=new THREE.Clock();
+  function lp(a,b,f){return a+(b-a)*f}
+
+  (function animate(){
+    requestAnimationFrame(animate);
+    var t=clock.getElapsedTime(),dt=Math.min(clock.getDelta(),0.05),sm=zoomedCity?0.06:0.04;
+    // Normalize ry to shortest path before lerping
+    while(cur.ry-tar.ry>Math.PI)cur.ry-=Math.PI*2;
+    while(cur.ry-tar.ry<-Math.PI)cur.ry+=Math.PI*2;
+    cur.ry=lp(cur.ry,tar.ry,sm);cur.rx=lp(cur.rx,tar.rx,sm);cur.cz=lp(cur.cz,tar.cz,sm);cur.cy=lp(cur.cy,tar.cy,sm);
+    cur.aO=lp(cur.aO,tar.aO,sm);cur.pS=lp(cur.pS,tar.pS,sm);cur.lO=lp(cur.lO,tar.lO,sm);
+    // Pausable auto-rotation accumulator
+    if(!zoomedCity) autoRotAccum+=dt*0.008;
+    globeGroup.rotation.y=cur.ry+ury+autoRotAccum;
+    globeGroup.rotation.x=cur.rx+urx;
+    camera.position.set(0,cur.cy,cur.cz);camera.lookAt(0,0,0);
+    landDots.material.opacity=cur.lO;
+    arcTubes.forEach(function(a){a.material.opacity=cur.aO});
+    tradeParts.forEach(function(p){p.pr+=p.sp*dt*cur.pS;if(p.pr>1)p.pr-=1;var pos=p.cv.getPointAt(p.pr);p.m.position.copy(pos);p.g.position.copy(pos);p.m.material.opacity=Math.sin(p.pr*Math.PI)*0.9;p.g.material.opacity=Math.sin(p.pr*Math.PI)*0.2});
+    cityMeshes.forEach(function(c){if(c.isPulse){var baseOp=c.hq?0.08:0.04;c.pulse.material.opacity=baseOp+Math.sin(t*3)*0.18;var s=1+Math.sin(t*2)*0.35;c.pulse.scale.set(s,s,s)}});
+    ambParts.forEach(function(p){p.a+=p.sp*dt*0.3;p.m.position.x=Math.cos(p.a)*p.d;p.m.position.z=Math.sin(p.a)*p.d;p.m.position.y=p.h+Math.sin(t*p.ys+p.a)*0.2});
+    o1.rotation.z+=0.0008;o2.rotation.z-=0.0005;
+    pl1.position.x=3+Math.sin(t*0.3)*2;pl1.position.y=2+Math.cos(t*0.2);
+    renderer.render(scene,camera);
+  })();
+  window.addEventListener('resize',function(){camera.aspect=box.clientWidth/box.clientHeight;camera.updateProjectionMatrix();renderer.setSize(box.clientWidth,box.clientHeight)});
+}
+
+// ═══ SCROLL HANDLER ═══
+function onScroll(){var sy=window.scrollY,dh=document.documentElement.scrollHeight-window.innerHeight;document.getElementById('scrollBar').style.width=(Math.min(sy/dh,1)*100)+'%';document.getElementById('topnav').classList.toggle('scrolled',sy>50);document.getElementById('scrollCue').classList.toggle('gone',sy>80);var secs=LD().sections;var aidx=0,sprog=0;for(var i=secs.length-1;i>=0;i--){var el=document.getElementById(secs[i].id);if(!el)continue;var r=el.getBoundingClientRect();if(r.top<window.innerHeight*0.5){aidx=i;sprog=Math.max(0,Math.min(1,(-r.top+window.innerHeight*0.5)/el.offsetHeight));break}}
+secs.forEach(function(s,i){var nb=document.getElementById('n-'+s.id),db=document.getElementById('d-'+s.id);if(nb)nb.className=i===aidx?'active':'';if(db)db.className=i===aidx?'on':''});
+document.querySelectorAll('.reveal').forEach(function(el){var r=el.getBoundingClientRect();el.classList.toggle('visible',r.top<window.innerHeight*0.82&&r.bottom>0)});
+var lbl=document.getElementById('globeLabel');if(lbl&&secs[aidx])lbl.textContent=secs[aidx].label||'';
+if(window._globeScroll)window._globeScroll(aidx,sprog)}
+
+// ═══ INIT ═══
+buildPage();initGlobe();
+window.addEventListener('scroll',onScroll,{passive:true});
+window.addEventListener('resize',onScroll);
+onScroll();
+</script>
+</body>
+</html>
