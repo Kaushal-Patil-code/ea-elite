@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 import SectionTag from '@/components/layout/SectionTag';
@@ -24,6 +24,21 @@ export default function DivisionCarousel() {
   const cardsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const glareRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const rafRef = useRef<Map<string, number>>(new Map());
+  const [flipped, setFlipped] = useState<Set<string>>(new Set());
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
+
+  const toggleFlip = useCallback((id: string) => {
+    setFlipped((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Scroll-triggered stagger entrance
   useEffect(() => {
@@ -107,8 +122,9 @@ export default function DivisionCarousel() {
               key={div.num}
               className="flip-card group"
               style={{ perspective: '800px' }}
-              onMouseMove={(e) => handleMouseMove(e, div.num)}
-              onMouseLeave={() => handleMouseLeave(div.num)}
+              onMouseMove={isTouchDevice ? undefined : (e) => handleMouseMove(e, div.num)}
+              onMouseLeave={isTouchDevice ? undefined : () => handleMouseLeave(div.num)}
+              onClick={() => toggleFlip(div.num)}
             >
               {/* Tilt wrapper — mouse-tracked */}
               <div
@@ -125,10 +141,13 @@ export default function DivisionCarousel() {
                   }}
                 />
 
-                {/* Flip inner — CSS hover */}
+                {/* Flip inner — hover on desktop, click on mobile */}
                 <div
-                  className="relative w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:[transform:rotateY(180deg)]"
-                  style={{ transformStyle: 'preserve-3d' }}
+                  className={`relative w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${!isTouchDevice ? 'group-hover:[transform:rotateY(180deg)]' : ''}`}
+                  style={{
+                    transformStyle: 'preserve-3d',
+                    transform: flipped.has(div.num) ? 'rotateY(180deg)' : undefined,
+                  }}
                 >
                   {/* ── FRONT FACE ── */}
                   <div
@@ -198,7 +217,7 @@ export default function DivisionCarousel() {
                       <div className="flex items-center gap-2" style={{ transform: 'translateZ(20px)' }}>
                         <div className="w-5 h-[1px]" style={{ background: `${div.color}40` }} />
                         <span className="text-white/20 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
-                          Hover to explore
+                          {isTouchDevice ? 'Tap to explore' : 'Hover to explore'}
                         </span>
                       </div>
                     </div>
@@ -283,6 +302,7 @@ export default function DivisionCarousel() {
 
                       <Link
                         href={div.href}
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium tracking-wide transition-all duration-300 hover:gap-3 self-start"
                         style={{
                           color: div.color,
