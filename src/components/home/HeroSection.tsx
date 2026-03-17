@@ -130,7 +130,7 @@ export default function HeroSection() {
         }}
       />
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12 w-full flex items-center justify-center pt-20 sm:pt-24">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12 w-full flex items-center justify-center pt-20 sm:pt-24 pb-24 sm:pb-28">
         <div className="flex flex-col gap-4 sm:gap-6 max-w-2xl text-center items-center">
           <h1
             ref={titleRef}
