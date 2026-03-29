@@ -322,8 +322,10 @@ export default function ContactContent() {
                   value={form.phone}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9]/g, '');
-                    setForm({ ...form, phone: val });
+                    if (val.length <= 15) setForm({ ...form, phone: val });
                   }}
+                  minLength={7}
+                  maxLength={15}
                   className={inputCls}
                 />
               </div>
