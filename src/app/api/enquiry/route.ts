@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   try {
     const { name, email, phone, company, subject, message, source } = await req.json();
@@ -20,11 +22,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const isJapan = source === 'japan';
     const emailSubject =
       subject ||
-      `${source === 'japan' ? 'Japan Expansion' : 'Contact'} Enquiry from ${name}`;
+      `${isJapan ? 'Japan Expansion' : 'Contact'} Enquiry from ${name}`;
 
-    const isJapan = source === 'japan';
     const accentColor = '#C5A55A';
     const darkBg = '#0B1224';
     const cardBg = '#111D35';
