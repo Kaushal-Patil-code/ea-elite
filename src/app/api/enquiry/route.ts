@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-
-export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,14 +10,6 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_APP_PASSWORD,
-      },
-    });
 
     const isJapan = source === 'japan';
     const emailSubject =
@@ -43,13 +32,7 @@ export async function POST(req: NextRequest) {
         <td style="padding:12px 16px;font-size:15px;color:${lightText}">${value}</td>
       </tr>`;
 
-    await transporter.sendMail({
-      from: `"EA Elite Website" <${process.env.SMTP_EMAIL}>`,
-      to: process.env.SMTP_EMAIL,
-      replyTo: email,
-      subject: emailSubject,
-      html: `
-<!DOCTYPE html>
+    const htmlBody = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background-color:${darkBg};font-family:'Segoe UI',Helvetica,Arial,sans-serif">
@@ -129,8 +112,28 @@ export async function POST(req: NextRequest) {
     </td></tr>
   </table>
 </body>
-</html>`,
+</html>`;
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: `EA Elite Website <${process.env.RESEND_FROM_EMAIL}>`,
+        to: [process.env.NOTIFY_EMAIL],
+        reply_to: email,
+        subject: emailSubject,
+        html: htmlBody,
+      }),
     });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Resend error:', err);
+      throw new Error('Email send failed');
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
